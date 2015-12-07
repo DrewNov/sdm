@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     cudaMemcpy(d_v1, h_v1, n_bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(d_v2, h_v2, n_bytes, cudaMemcpyHostToDevice);
 
-    main_cuda<<<grid, block >>>(d_v1, d_v2, d_result);
+    main_cuda<<<grid,block>>>(d_v1, d_v2, d_result);
 
     cudaEvent_t event;
 
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     cudaMemcpy(h_result, d_result, n_bytes, cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < n; ++i) {
-        printf("%d. %d\n", i, h_result[i]);
+        printf("%4d: %4.1f\n", i, h_result[i]);
     }
 
     cudaEventDestroy(event);
