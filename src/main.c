@@ -60,9 +60,19 @@ int main(int argc, char *argv[]) {
 
 	//sdm part
 	sdm_jaekel_t sdm;
-	int result = sdm_init(&sdm, 128, 10);
-	printf("SDM init result: %d\n", result);
-	printf("SDM size: %lu\n", sizeof(sdm));
+
+	sdm_init(&sdm, 100, 10, 3);
+
+	printf("SDM size: %lu\n\n", sizeof(sdm));
+
+	for (int i = 0; i < sdm.nidx * sdm.nloc; i += sdm.nidx) {
+		printf("SDM indexes for location #%3d:", i / sdm.nidx + 1);
+		for (int j = 0; j < sdm.nidx; ++j) {
+			printf("%5d", sdm.idxs[i + j]);
+		}
+		printf("\n");
+	}
+
 	sdm_free(&sdm);
 
 	return 0;
