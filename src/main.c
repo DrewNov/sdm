@@ -71,13 +71,13 @@ int main(int argc, char *argv[]) {
 	int nidx = 3; //atoi(argv[3]); //3
 
 	int *addr = (int[]) {0,1,0,1,0,1,0,1,0,1};
+	int *addr2 = (int[]) {0,1,0,1,0,0,0,1,0,1};
 	int *v_in = (int[]) {0,1,0,0,1,0,1,0,1,0};
 	int *v_out = (int *) malloc(ndim * sizeof(int));
 
 	sdm_init(&sdm, nloc, ndim, nidx);
 
 	printf("SDM size: %lu\n\n", sizeof(sdm));
-
 	for (int i = 0; i < sdm.nidx * sdm.nloc; i += sdm.nidx) {
 		printf("SDM indexes for location #%3d:", i / sdm.nidx + 1);
 		for (int j = 0; j < sdm.nidx; ++j) {
@@ -85,16 +85,20 @@ int main(int argc, char *argv[]) {
 		}
 		printf("\n");
 	}
+	printf("\n");
 
-	printf(" addr: "); for (int k = 0; k < ndim; ++k) printf("%d", addr[k]); printf("\n");
+	printf("addr1: "); for (int k = 0; k < ndim; ++k) printf("%d", addr[k]); printf("\n");
 	printf(" v_in: "); for (int k = 0; k < ndim; ++k) printf("%d", v_in[k]); printf("\n");
-	printf("v_out: "); for (int k = 0; k < ndim; ++k) printf("%d", v_out[k]); printf("\n");
-
 	printf("Write: %d locations activated\n", sdm_write(&sdm, addr, v_in));
-	printf(" Read: %d locations activated\n", sdm_read(&sdm, addr, v_out));
+	printf("\n");
 
-	printf(" addr: "); for (int k = 0; k < ndim; ++k) printf("%d", addr[k]); printf("\n");
-	printf(" v_in: "); for (int k = 0; k < ndim; ++k) printf("%d", v_in[k]); printf("\n");
+	printf("addr1: "); for (int k = 0; k < ndim; ++k) printf("%d", addr[k]); printf("\n");
+	printf("Read1: %d locations activated\n", sdm_read(&sdm, addr, v_out));
+	printf("v_out: "); for (int k = 0; k < ndim; ++k) printf("%d", v_out[k]); printf("\n");
+	printf("\n");
+
+	printf("addr2: "); for (int k = 0; k < ndim; ++k) printf("%d", addr2[k]); printf("\n");
+	printf("Read2: %d locations activated\n", sdm_read(&sdm, addr2, v_out));
 	printf("v_out: "); for (int k = 0; k < ndim; ++k) printf("%d", v_out[k]); printf("\n");
 
 	sdm_free(&sdm);
