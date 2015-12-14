@@ -1,3 +1,9 @@
+/*
+ * This is implementation of Jaekel's version of SDM
+ * by DrewNov, December 2015.
+ * C Binary Vector Symbols (CBVS) was taken as a basis. (http://pendicular.net/cbvs.php)
+ */
+
 typedef struct {
 	/* SDM state variables and parameters */
 	int *cntr;		/* Counters */
@@ -15,3 +21,6 @@ typedef struct {
 
 void sdm_init(sdm_jaekel_t *sdm, int nloc, int ndim, int nidx);
 void sdm_free(sdm_jaekel_t *sdm);
+
+int sdm_write(sdm_jaekel_t *sdm, int *addr, int *v_in);
+int sdm_read(sdm_jaekel_t *sdm, int *addr, int *v_out);
