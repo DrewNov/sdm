@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdio.h>
 #include "sdm_jaekel.h"
 
 
@@ -111,6 +112,31 @@ void sdm_free(sdm_jaekel_t *sdm) {
 	if (sdm->sumc != 0) free(sdm->sumc);
 	memset(sdm, 0, sizeof(sdm_jaekel_t));
 }
+
+void sdm_print(sdm_jaekel_t *sdm) {
+	int i, j;
+
+	for (i = 0; i < sdm->nloc; ++i) {
+		printf("#%3d:", i);
+
+		//Run through Counters:
+		for (j = sdm->ndim * i; j < sdm->ndim * (i + 1); ++j) {
+			int cntr = sdm->cntr[j];
+			printf("%4d", cntr);
+		}
+		printf("\t\t");
+
+		//Run through Indexes:
+		for (j = sdm->nidx * i; j < sdm->nidx * (i + 1); ++j) {
+			int idx = sdm->idxs[j];
+			printf("%5d", idx);
+		}
+		printf("\n");
+	}
+
+	printf("\n");
+}
+
 
 int sdm_write(sdm_jaekel_t *sdm, int *addr, int *v_in) {
 	int i;
