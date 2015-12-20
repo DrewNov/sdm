@@ -17,7 +17,7 @@ $(OUT_DIR)/%.o: $(SRC_DIR)/%.c
 	$(COMPILER) $(C_PARAMS) -c $< -o $@
 
 $(OUT_NAME): $(OBJS)
-	$(COMPILER) -o $(OUT_DIR)/$@ $(OBJS)
+	$(COMPILER) -O2 -g -pg -o $(OUT_DIR)/$@ $(OBJS)
 
 
 clean:
