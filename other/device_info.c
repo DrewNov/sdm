@@ -36,6 +36,7 @@ int main() {
 		printf("Texture alignment: %d\n", deviceProp.textureAlignment);
 		printf("Device overlap: %d\n", deviceProp.deviceOverlap);
 		printf("Multiprocessor count: %d\n", deviceProp.multiProcessorCount);
+		printf("Concurrent Kernels: %d\n", deviceProp.concurrentKernels);
 
 		printf("Kernel execution timeout enabled: %s\n",
 			   deviceProp.kernelExecTimeoutEnabled ? "true" : "false");

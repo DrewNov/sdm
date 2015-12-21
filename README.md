@@ -19,4 +19,5 @@ Device count: 2
 - Texture alignment: 512
 - Device overlap: 1
 - Multiprocessor count: 14
+- Concurrent Kernels: 1
 - Kernel execution timeout enabled: false
