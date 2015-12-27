@@ -11,77 +11,6 @@
 #include "sdm_jaekel.h"
 
 
-//CUDA functions:
-__global__ void d_sdm_activate(int *idxs, int *addr, int *nidx, int *actl, int *nact) {
-	int i = threadIdx.x, j = 0, flag = 1;
-
-	for (j = (*nidx) * i; j < (*nidx) * (i + 1); ++j) {
-		int idx = idxs[j];
-
-		if (addr[abs(idx)] != (idx > 0)) { //todo: clarify what to do if 0
-			flag = 0;
-			break;
-		}
-	}
-
-	if (flag) {
-		actl[(*nact)++] = i;
-	}
-}
-
-void sdm_activate_cuda(sdm_jaekel_t *sdm, int *addr) {
-	dim3 grid = dim3(1, 1, 1);
-	dim3 block = dim3(sdm->nloc, 1, 1);
-
-	cudaEvent_t start, stop;
-	float time;
-
-	int *d_idxs;
-	int *d_addr;
-	int *d_nidx;
-	int *d_actl;
-	int *d_nact;
-
-	sdm->nact = 0;
-
-	cudaMalloc((void **) &d_idxs, sdm->nidx * sizeof(int));
-	cudaMalloc((void **) &d_addr, sdm->ndim * sizeof(int));
-	cudaMalloc((void **) &d_nidx, sizeof(int));
-	cudaMalloc((void **) &d_actl, sdm->nloc * sizeof(int));
-	cudaMalloc((void **) &d_nact, sizeof(int));
-
-	cudaMemcpy(d_idxs, sdm->idxs, sdm->nidx * sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_addr, addr, sdm->ndim * sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_nidx, &(sdm->nidx), sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_nact, &(sdm->nact), sizeof(int), cudaMemcpyHostToDevice);
-
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
-
-	cudaEventRecord(start, 0);
-	d_sdm_activate << < grid, block >> > (d_idxs, d_addr, d_nidx, d_actl, d_nact);
-	cudaEventRecord(stop, 0);
-
-	cudaEventSynchronize(stop);
-
-	cudaEventElapsedTime(&time, start, stop);
-
-	cudaEventDestroy(start);
-	cudaEventDestroy(stop);
-
-	cudaMemcpy(&(sdm->nact), d_nact, sizeof(int), cudaMemcpyDeviceToHost);
-	cudaMemcpy(&(sdm->actl), d_actl, sdm->nact * sizeof(int), cudaMemcpyDeviceToHost);
-
-	cudaFree(d_idxs);
-	cudaFree(d_addr);
-	cudaFree(d_nidx);
-	cudaFree(d_actl);
-	cudaFree(d_nact);
-
-	printf("Time: %f\n", time);
-}
-
-
 //Helper functions:
 void sdm_activate(sdm_jaekel_t *sdm, int *addr) {
 	int i, j, k = 0;
@@ -213,7 +142,6 @@ int sdm_write(sdm_jaekel_t *sdm, int *addr, int *v_in) {
 	int i;
 
 	sdm_activate(sdm, addr);
-	//sdm_activate_cuda(sdm, addr);
 
 	for (i = 0; i < sdm->nact; i++) {
 		sdm_cntrvary(sdm, &(sdm->cntr[sdm->actl[i] * sdm->ndim]), v_in);
@@ -224,7 +152,6 @@ int sdm_write(sdm_jaekel_t *sdm, int *addr, int *v_in) {
 
 int sdm_read(sdm_jaekel_t *sdm, int *addr, int *v_out) {
 	sdm_activate(sdm, addr);
-	//sdm_activate_cuda(sdm, addr);
 	sdm_cntrsum(sdm);
 	sdm_sum2bin(sdm, v_out);
 
