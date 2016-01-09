@@ -8,28 +8,28 @@
 #define BIN2STR(x, n) bin2str(x, n)
 
 
-inline long str2bin(char *str, int n) {
+inline unsigned long str2bin(char *str, int n) {
 	int i = 0;
-	long bin = 0;
+	unsigned long bin = 0;
 
 	for (i = 0; i < n; ++i) {
 		bin <<= 1;
-		bin += str[i] - '0';
+		bin |= str[i] - '0';
 	}
 
 	return bin;
 }
 
-inline char *bin2str(long bin, int n) {
-	int i = 0;
+inline char *bin2str(unsigned long bin, int n) {
+	int i;
 	char *str = (char *) malloc(n * sizeof(char) + 1);
 
-	for (i = 0; i < n; ++i) {
+	for (i = n - 1; i >= 0; --i) {
 		str[i] = (char) ((bin & 1) + '0');
 		bin >>= 1;
 	}
 
-	str[i] = '\0';
+	str[n] = '\0';
 
 	return str;
 }
@@ -53,5 +53,5 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned sh
 void sdm_free(sdm_jaekel_t *sdm);
 void sdm_print(sdm_jaekel_t *sdm);
 
-int sdm_write(sdm_jaekel_t *sdm, long addr, long v_in);
-int sdm_read(sdm_jaekel_t *sdm, long addr, long v_out);
+int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in);
+int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out);

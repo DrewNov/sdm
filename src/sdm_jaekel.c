@@ -12,35 +12,27 @@
 
 
 //Helper functions:
-void sdm_activate(sdm_jaekel_t *sdm, int *addr) {
-	int i, j, k = 0;
+void sdm_activate(sdm_jaekel_t *sdm, unsigned long addr) {
+	unsigned short i, j = 0;
+	unsigned long *mask = sdm->mask;
 
 	for (i = 0; i < sdm->n; ++i) {
-		int flag = 1;
-
-		for (j = sdm->k * i; j < sdm->k * (i + 1); ++j) {
-			int idx = sdm->mask[j];
-
-			if (addr[abs(idx)] != (idx > 0)) { //todo: clarify what to do if 0
-				flag = 0;
-				break;
-			}
+		if (!(addr & *mask ^ *(mask + 1))) {
+			sdm->actl[j++] = i;
 		}
-
-		if (flag) {
-			sdm->actl[k] = i;
-			k++;
-		}
+		mask += 2;
 	}
 
-	sdm->nact = k;
+	sdm->nact = j;
 }
 
-void sdm_cntrvary(sdm_jaekel_t *sdm, short *p_cntr, int *v_in) {
+void sdm_cntrvary(sdm_jaekel_t *sdm, short *p_cntr, unsigned long v_in) {
 	int i;
 
-	for (i = 0; i < sdm->d; i++) {
-		v_in[i] ? p_cntr[i]++ : p_cntr[i]--;
+	p_cntr += sdm->d - 1; //pointer to last counter in location
+
+	for (i = 0; i < sdm->d; ++i) {
+		1L << i & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
 	}
 }
 
@@ -59,39 +51,39 @@ void sdm_cntrsum(sdm_jaekel_t *sdm) {
 	memset(sdm->sumc, 0, sdm->d * sizeof(short));
 
 	for (i = 0; i < sdm->nact; i++) {
-		sdm_cntradd(sdm, &(sdm->cntr[sdm->actl[i] * sdm->d]));
+		sdm_cntradd(sdm, sdm->cntr + sdm->actl[i] * sdm->d);
 	}
 }
 
-int sdm_sum2bit(short cntrsum) {
-	//return (cntrsum > 0) ? 1 : ((cntrsum < 0) ? 0 : (int) (random() % 2));
-	return cntrsum > 0; //todo: clarify what to do if 0
-}
-
-void sdm_sum2bin(sdm_jaekel_t *sdm, int *vect) {
+void sdm_sum2bin(sdm_jaekel_t *sdm, unsigned long *vect) {
 	int i;
 
+	*vect = 0;
+
 	for (i = 0; i < sdm->d; ++i) {
-		vect[i] = sdm_sum2bit(sdm->sumc[i]);
+		*vect <<= 1;
+		*vect |= sdm->sumc[i] > 0;
 	}
 }
 
 
 //Main functions:
 void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned short k) {
-	sdm->cntr = (short *) malloc(n * d * sizeof(short));
+	unsigned long size_short = sizeof(short);
+
+	sdm->cntr = (short *) malloc(n * d * size_short);
 	sdm->mask = (unsigned long *) malloc(n * 2 * sizeof(long));
 	sdm->n = n;
 	sdm->d = d;
 	sdm->k = k;
 
-	sdm->actl = (unsigned short *) malloc(n * sizeof(short));
-	sdm->sumc = (short *) malloc(d * sizeof(short));
+	sdm->actl = (unsigned short *) malloc(n * size_short);
+	sdm->sumc = (short *) malloc(d * size_short);
 	sdm->nact = 0;
 
-	memset(sdm->cntr, 0, n * d * sizeof(short));
-	memset(sdm->actl, 0, n * sizeof(short));
-	memset(sdm->sumc, 0, d * sizeof(short));
+	memset(sdm->cntr, 0, n * d * size_short);
+	memset(sdm->actl, 0, n * size_short);
+	memset(sdm->sumc, 0, d * size_short);
 
 	/* Initialize mask randomly */
 	srandom((unsigned int) time(NULL));
@@ -107,8 +99,8 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned sh
 			long rnd_digit = random() % d;
 
 			if (!(selection_mask >> rnd_digit & 1)) {
-				selection_mask += 1 << rnd_digit;
-				value_mask += (random() % 2) << rnd_digit;
+				selection_mask |= 1L << rnd_digit;
+				value_mask |= random() % 2 << rnd_digit;
 				j--;
 			}
 		}
@@ -128,42 +120,38 @@ void sdm_free(sdm_jaekel_t *sdm) {
 
 void sdm_print(sdm_jaekel_t *sdm) {
 	int i, j;
+	unsigned long *mask = sdm->mask;
 
 	for (i = 0; i < sdm->n; ++i) {
-		printf("#%3d:", i);
+		printf("#%4d:", i);
 
 		//Run through Counters:
 		for (j = sdm->d * i; j < sdm->d * (i + 1); ++j) {
-			short cntr = sdm->cntr[j];
-			printf("%4d", cntr);
+			printf("%2d", sdm->cntr[j]);
 		}
-		printf("\t\t");
 
 		//Run through Indexes:
-		for (j = sdm->k * i; j < sdm->k * (i + 1); ++j) {
-			int idx = sdm->mask[j];
-			printf("%5d", idx);
-		}
-		printf("\n");
+		printf("\nmask1: %s\nmask2: %s\n\n", BIN2STR(*mask, sdm->d), BIN2STR(*(mask + 1), sdm->d));
+		mask += 2;
 	}
 
 	printf("\n");
 }
 
 
-int sdm_write(sdm_jaekel_t *sdm, long addr, long v_in) {
+int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
 	int i;
 
 	sdm_activate(sdm, addr);
 
 	for (i = 0; i < sdm->nact; i++) {
-		sdm_cntrvary(sdm, &(sdm->cntr[sdm->actl[i] * sdm->d]), v_in);
+		sdm_cntrvary(sdm, sdm->cntr + sdm->actl[i] * sdm->d, v_in);
 	}
 
 	return sdm->nact;
 }
 
-int sdm_read(sdm_jaekel_t *sdm, long addr, long v_out) {
+int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out) {
 	sdm_activate(sdm, addr);
 	sdm_cntrsum(sdm);
 	sdm_sum2bin(sdm, v_out);
