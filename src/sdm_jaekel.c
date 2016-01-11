@@ -11,6 +11,28 @@
 #include "sdm_jaekel.h"
 
 
+//Cuda functions:
+__global__ void sdm_write_cuda(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
+	unsigned short i, j, k = 0;
+	unsigned long *mask = sdm->mask;
+
+	for (i = 0; i < sdm->n; ++i) {
+		if (!(addr & *mask ^ *(mask + 1))) {
+			short *p_cntr = sdm->cntr + (i + 1) * sdm->d - 1; //pointer to last counter in location
+
+			for (j = 0; j < sdm->d; ++j) {
+				1L << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
+			}
+
+			k++;
+		}
+		mask += 2;
+	}
+
+	sdm->nact = k;
+}
+
+
 //Helper functions:
 void sdm_activate(sdm_jaekel_t *sdm, unsigned long addr) {
 	unsigned short i, j = 0;
