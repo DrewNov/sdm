@@ -12,24 +12,19 @@
 
 
 //Cuda functions:
-__global__ void sdm_write_cuda(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
-	unsigned short i, j, k = 0;
-	unsigned long *mask = sdm->mask;
+__global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned long v_in, int *nact) {
+	int i = threadIdx.x, j;
 
-	for (i = 0; i < sdm->n; ++i) {
-		if (!(addr & *mask ^ *(mask + 1))) {
-			short *p_cntr = sdm->cntr + (i + 1) * sdm->d - 1; //pointer to last counter in location
+	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
+		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
 
-			for (j = 0; j < sdm->d; ++j) {
-				1L << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
-			}
-
-			k++;
+		for (j = 0; j < sdm.d; ++j) {
+			1L << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
+			//(*p_cntr--) = (short) i;
 		}
-		mask += 2;
-	}
 
-	sdm->nact = k;
+		(*nact)++;
+	}
 }
 
 
@@ -91,26 +86,28 @@ void sdm_sum2bin(sdm_jaekel_t *sdm, unsigned long *vect) {
 
 //Main functions:
 void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned short k) {
-	unsigned long size_short = sizeof(short);
+	int i;
+	unsigned long *h_mask;
+	size_t size_short = sizeof(short);
 
-	sdm->cntr = (short *) malloc(n * d * size_short);
-	sdm->mask = (unsigned long *) malloc(n * 2 * sizeof(long));
+	cudaMalloc((void **) &(sdm->cntr), n * d * size_short);
+	cudaMalloc((void **) &(sdm->mask), n * 2 * sizeof(long));
 	sdm->n = n;
 	sdm->d = d;
 	sdm->k = k;
 
-	sdm->actl = (unsigned short *) malloc(n * size_short);
-	sdm->sumc = (short *) malloc(d * size_short);
+	cudaMalloc((void **) &(sdm->actl), n * size_short);
+	cudaMalloc((void **) &(sdm->sumc), d * size_short);
 	sdm->nact = 0;
 
-	memset(sdm->cntr, 0, n * d * size_short);
-	memset(sdm->actl, 0, n * size_short);
-	memset(sdm->sumc, 0, d * size_short);
+	cudaMemset(sdm->cntr, 0, n * d * size_short);
+	cudaMemset(sdm->actl, 0, n * size_short);
+	cudaMemset(sdm->sumc, 0, d * size_short);
 
 	/* Initialize mask randomly */
 	srandom((unsigned int) time(NULL));
 
-	int i = 0;
+	h_mask = (unsigned long *) malloc(n * 2 * sizeof(long));
 
 	for (i = 0; i < n; ++i) {
 		int j = k;
@@ -127,9 +124,11 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned sh
 			}
 		}
 
-		sdm->mask[2 * i] = selection_mask;
-		sdm->mask[2 * i + 1] = value_mask;
+		h_mask[2 * i] = selection_mask;
+		h_mask[2 * i + 1] = value_mask;
 	}
+
+	cudaMemcpy(sdm->mask, h_mask, n * 2 * sizeof(long), cudaMemcpyHostToDevice);
 }
 
 void sdm_free(sdm_jaekel_t *sdm) {
@@ -142,19 +141,26 @@ void sdm_free(sdm_jaekel_t *sdm) {
 
 void sdm_print(sdm_jaekel_t *sdm) {
 	int i, j;
-	unsigned long *mask = sdm->mask;
+
+	short *cntr = (short *) malloc(sdm->n * sdm->d * sizeof(short));
+	unsigned long *mask = (unsigned long *) malloc(sdm->n * 2 * sizeof(long));
+
+	cudaMemcpy(cntr, sdm->cntr, sdm->n * sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
+	cudaMemcpy(mask, sdm->mask, sdm->n * 2 * sizeof(long), cudaMemcpyDeviceToHost);
 
 	for (i = 0; i < sdm->n; ++i) {
-		printf("#%4d:", i);
+		if (*(cntr + i * sdm->d)) {
+			printf("#%4d:", i);
 
-		//Run through Counters:
-		for (j = sdm->d * i; j < sdm->d * (i + 1); ++j) {
-			printf("%2d", sdm->cntr[j]);
+			//Run through Counters:
+			for (j = sdm->d * i; j < sdm->d * (i + 1); ++j) {
+				printf("%2d", cntr[j]);
+			}
+
+			//Run through Indexes:
+			printf("\nmask1: %s\nmask2: %s\n\n", BIN2STR(*mask, sdm->d), BIN2STR(*(mask + 1), sdm->d));
+			mask += 2;
 		}
-
-		//Run through Indexes:
-		printf("\nmask1: %s\nmask2: %s\n\n", BIN2STR(*mask, sdm->d), BIN2STR(*(mask + 1), sdm->d));
-		mask += 2;
 	}
 
 	printf("\n");
@@ -162,15 +168,17 @@ void sdm_print(sdm_jaekel_t *sdm) {
 
 
 int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
-	int i;
+	int h_nact = 0;
+	int *d_nact;
 
-	sdm_activate(sdm, addr);
+	cudaMalloc((void **) &d_nact, sizeof(int));
+	cudaMemset(d_nact, 0, sizeof(int));
 
-	for (i = 0; i < sdm->nact; i++) {
-		sdm_cntrvary(sdm, sdm->cntr + sdm->actl[i] * sdm->d, v_in);
-	}
+	sdm_write_cuda <<<1, sdm->n>>> (*sdm, addr, v_in, d_nact);
 
-	return sdm->nact;
+	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
+
+	return h_nact;
 }
 
 int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out) {
