@@ -5,7 +5,7 @@ SRC_DIR = src
 OUT_DIR = bin
 OUT_NAME = sdm
 
-OBJS := $(addprefix $(OUT_DIR)/, main.o sdm_jaekel.o)
+OBJS := $(addprefix $(OUT_DIR)/, main.o sdm_jaekel.o bmp.o)
 
 
 all: $(OUT_DIR) $(OUT_NAME)
