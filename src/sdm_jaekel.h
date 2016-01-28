@@ -35,17 +35,13 @@ inline char *bin2str(unsigned long bin, int n) {
 }
 
 typedef struct {
-	/* SDM state variables and parameters */
 	short *cntr;			/* Counters */
 	unsigned long *mask;	/* Indexes */
+	short *sumc;			/* Sum of counter vectors */
+
 	unsigned short n;		/* Number of locations */
 	unsigned short d;		/* Number of dimensions in location */
 	unsigned short k;		/* Number of selection-bits in mask */
-
-	/* SDM read/write state variables */
-	unsigned short *actl;	/* Active locations */
-	short *sumc;			/* Sum of counter vectors */
-	unsigned short nact;	/* Number of active locations */
 } sdm_jaekel_t;
 
 

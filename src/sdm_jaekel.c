@@ -11,75 +11,34 @@
 #include "sdm_jaekel.h"
 
 
-//Cuda functions:
+//CUDA functions:
 __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned long v_in, int *nact) {
-	int i = threadIdx.x, j;
+	int i = threadIdx.x;
+	int j;
 
 	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
 		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
 
 		for (j = 0; j < sdm.d; ++j) {
 			1L << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
-			//(*p_cntr--) = (short) i;
 		}
 
 		(*nact)++;
 	}
 }
 
+__global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned long addr, int *nact) {
+	int i = threadIdx.x;
+	int j;
 
-//Helper functions:
-void sdm_activate(sdm_jaekel_t *sdm, unsigned long addr) {
-	unsigned short i, j = 0;
-	unsigned long *mask = sdm->mask;
+	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
+		short *p_cntr = sdm.cntr + i * sdm.d;
 
-	for (i = 0; i < sdm->n; ++i) {
-		if (!(addr & *mask ^ *(mask + 1))) {
-			sdm->actl[j++] = i;
+		for (j = 0; j < sdm.d; j++) {
+			sdm.sumc[j] += p_cntr[j];
 		}
-		mask += 2;
-	}
 
-	sdm->nact = j;
-}
-
-void sdm_cntrvary(sdm_jaekel_t *sdm, short *p_cntr, unsigned long v_in) {
-	int i;
-
-	p_cntr += sdm->d - 1; //pointer to last counter in location
-
-	for (i = 0; i < sdm->d; ++i) {
-		1L << i & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
-	}
-}
-
-void sdm_cntradd(sdm_jaekel_t *sdm, short *p_cntr) {
-	int i;
-	short *p_sum = sdm->sumc;
-
-	for (i = 0; i < sdm->d; i++) {
-		(*p_sum++) += (*p_cntr++);
-	}
-}
-
-void sdm_cntrsum(sdm_jaekel_t *sdm) {
-	int i;
-
-	memset(sdm->sumc, 0, sdm->d * sizeof(short));
-
-	for (i = 0; i < sdm->nact; i++) {
-		sdm_cntradd(sdm, sdm->cntr + sdm->actl[i] * sdm->d);
-	}
-}
-
-void sdm_sum2bin(sdm_jaekel_t *sdm, unsigned long *vect) {
-	int i;
-
-	*vect = 0;
-
-	for (i = 0; i < sdm->d; ++i) {
-		*vect <<= 1;
-		*vect |= sdm->sumc[i] > 0;
+		(*nact)++;
 	}
 }
 
@@ -92,16 +51,13 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned sh
 
 	cudaMalloc((void **) &(sdm->cntr), n * d * size_short);
 	cudaMalloc((void **) &(sdm->mask), n * 2 * sizeof(long));
+	cudaMalloc((void **) &(sdm->sumc), d * size_short);
+
 	sdm->n = n;
 	sdm->d = d;
 	sdm->k = k;
 
-	cudaMalloc((void **) &(sdm->actl), n * size_short);
-	cudaMalloc((void **) &(sdm->sumc), d * size_short);
-	sdm->nact = 0;
-
 	cudaMemset(sdm->cntr, 0, n * d * size_short);
-	cudaMemset(sdm->actl, 0, n * size_short);
 	cudaMemset(sdm->sumc, 0, d * size_short);
 
 	/* Initialize mask randomly */
@@ -132,10 +88,9 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned sh
 }
 
 void sdm_free(sdm_jaekel_t *sdm) {
-	if (sdm->cntr != 0) free(sdm->cntr);
-	if (sdm->mask != 0) free(sdm->mask);
-	if (sdm->actl != 0) free(sdm->actl);
-	if (sdm->sumc != 0) free(sdm->sumc);
+	if (sdm->cntr != 0) cudaFree(sdm->cntr);
+	if (sdm->mask != 0) cudaFree(sdm->mask);
+	if (sdm->sumc != 0) cudaFree(sdm->sumc);
 	memset(sdm, 0, sizeof(sdm_jaekel_t));
 }
 
@@ -174,7 +129,7 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
 	cudaMalloc((void **) &d_nact, sizeof(int));
 	cudaMemset(d_nact, 0, sizeof(int));
 
-	sdm_write_cuda <<<1, sdm->n>>> (*sdm, addr, v_in, d_nact);
+	sdm_write_cuda <<< 1, sdm->n >>> (*sdm, addr, v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -182,9 +137,27 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
 }
 
 int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out) {
-	sdm_activate(sdm, addr);
-	sdm_cntrsum(sdm);
-	sdm_sum2bin(sdm, v_out);
+	int i;
+	int h_nact = 0;
+	int *d_nact;
+	short *h_sumc = (short *) malloc(sdm->d * sizeof(short));
 
-	return sdm->nact;
+	cudaMalloc((void **) &d_nact, sizeof(int));
+	cudaMemset(d_nact, 0, sizeof(int));
+
+	cudaMemset(sdm->sumc, 0, sdm->d * sizeof(short));
+
+	sdm_read_cuda <<< 1, sdm->n >>> (*sdm, addr, d_nact);
+
+	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(h_sumc, sdm->sumc, sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
+
+	*v_out = 0;
+
+	for (i = 0; i < sdm->d; ++i) {
+		*v_out <<= 1;
+		*v_out |= h_sumc[i] > 0;
+	}
+
+	return h_nact;
 }
