@@ -9,6 +9,7 @@ unsigned short read_u16(FILE *fp) {
 
 	return ((b1 << 8) | b0);
 }
+
 unsigned int read_u32(FILE *fp) {
 	unsigned char b0, b1, b2, b3;
 
@@ -61,7 +62,16 @@ int bmp() {
 	printf("biHeight: %d\n", infoHeader.biHeight);
 	printf("biBitCount: %d\n", infoHeader.biBitCount);
 	printf("biPlanes: %d\n", infoHeader.biPlanes);
-	printf("biCompression: %d\n", infoHeader.biCompression);
+	printf("biCompression: %d\n\n", infoHeader.biCompression);
+
+	fseek(file_in, header.bfOffBits, SEEK_SET);
+
+	for (int i = 0; i < 20; ++i) {
+		printf("%d ", fgetc(file_in));
+		printf("%d ", fgetc(file_in));
+		printf("%d\n", fgetc(file_in));
+		fgetc(file_in);
+	}
 
 	fclose(file_in);
 
