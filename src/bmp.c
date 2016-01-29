@@ -22,7 +22,7 @@ unsigned int read_u32(FILE *fp) {
 }
 
 int bmp() {
-	char *path = "girl.bmp";
+	char *path = "img/lena32.bmp";
 	FILE *file_in = fopen(path, "rb");
 
 	if (!file_in) {
@@ -62,15 +62,17 @@ int bmp() {
 	printf("biHeight: %d\n", infoHeader.biHeight);
 	printf("biBitCount: %d\n", infoHeader.biBitCount);
 	printf("biPlanes: %d\n", infoHeader.biPlanes);
-	printf("biCompression: %d\n\n", infoHeader.biCompression);
+	printf("biCompression: %d\n", infoHeader.biCompression);
+	printf("biClrUsed: %d\n", infoHeader.biClrUsed);
+	printf("biClrImportant: %d\n\n", infoHeader.biClrImportant);
 
 	fseek(file_in, header.bfOffBits, SEEK_SET);
 
-	for (int i = 0; i < 20; ++i) {
-		printf("%d ", fgetc(file_in));
-		printf("%d ", fgetc(file_in));
-		printf("%d\n", fgetc(file_in));
-		fgetc(file_in);
+	for (int i = 0; i < infoHeader.biHeight; ++i) {
+		for (int j = 0; j < infoHeader.biWidth; ++j) {
+			printf("%4d", fgetc(file_in));
+		}
+		printf("\n");
 	}
 
 	fclose(file_in);
