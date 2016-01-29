@@ -20,5 +20,10 @@ typedef struct {
 	unsigned int biClrImportant;
 } BITMAPINFOHEADER;
 
+typedef struct {
+	BITMAPFILEHEADER header;
+	BITMAPINFOHEADER infoHeader;
+	unsigned char *pixels;
+} bmp8_t;
 
-int bmp();
+int bmp_read(bmp8_t *bmp, char *path);
