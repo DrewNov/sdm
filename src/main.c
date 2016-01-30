@@ -62,23 +62,18 @@ int main(int argc, char *argv[]) {
 	//Writing pixels by layers into SDM
 	for (int j = 0; j < bmp.infoHeader.biBitCount; ++j) {
 		unsigned long vector = 0;
-		unsigned long layer_mask = 1L << j;
-
-		printf("#%d\n", j);
+		unsigned char layer_mask = 1L << j;
 
 		for (int i = 0; i < bmp.infoHeader.biSizeImage; ++i) {
 			vector <<= 1;
-			vector |= bmp.pixels[i] & layer_mask;
+			vector |= (bmp.pixels[i] & layer_mask) >> j;
 
 			if ((i + 1) % d == 0) {
 				sdm_write(&sdm, vector, vector);
 				*p_vectors++ = vector;
-				printf("vector: %30lu\t%s\n", vector, BIN2STR(vector, d));
 				vector = 0;
 			}
 		}
-
-		printf("\n");
 	}
 
 	//Reading from SDM and writing to new bmp file with the same headers
@@ -98,14 +93,14 @@ int main(int argc, char *argv[]) {
 	}
 
 	for (int k = 0; k < vectors_in_layer; ++k) { //converting vectors to pixels
-		for (int j = 0; j < d; ++j) {
+		for (int j = d - 1; j >= 0; --j) {
 			unsigned char pixel = 0;
 			unsigned long digit_mask = 1L << j;
 
-			for (int i = 0; i < bmp.infoHeader.biBitCount; ++i) {
+			for (int i = bmp.infoHeader.biBitCount - 1; i >= 0; --i) {
 				unsigned long vector = vectors[i * vectors_in_layer + k];
 				pixel <<= 1;
-				pixel |= vector & digit_mask;
+				pixel |= (vector & digit_mask) >> j;
 			}
 
 			*p_pixels_out++ = pixel;
