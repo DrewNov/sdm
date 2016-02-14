@@ -20,7 +20,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned lo
 		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
 
 		for (j = 0; j < sdm.d; ++j) {
-			1L << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
+			1UL << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
 		}
 
 		(*nact)++;
@@ -73,8 +73,8 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned sh
 		while (j) {
 			long rnd_digit = random() % d;
 
-			if (!(selection_mask >> rnd_digit & 1)) {
-				selection_mask |= 1L << rnd_digit;
+			if (!(selection_mask >> rnd_digit & 1UL)) {
+				selection_mask |= 1UL << rnd_digit;
 				value_mask |= random() % 2 << rnd_digit;
 				j--;
 			}
