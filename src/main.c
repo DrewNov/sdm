@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
 	unsigned short n, d, k;
 	unsigned long *vectors, *p_vectors;
 	unsigned char *pixels_out, *p_pixels_out;
-	char *path_in = "img/lena32.bmp", path_out[36];
+	char *path_in = "img/lena512.bmp", path_out[36];
 
 	if (argc == 1) {
 		printf("Example of use: sdm 1024 64 8, where n=1024; d=64; k=8\n");
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
 		k = (unsigned short) atoi(argv[3]);
 	}
 
-	sprintf(path_out, "img/lena32_%d_%d_%d_%d.bmp", n, d, k, (unsigned int) time(NULL));
+	sprintf(path_out, "img/lena512_%d_%d_%d_%d.bmp", n, d, k, (unsigned int) time(NULL));
 
 	sdm_init(&sdm, n, d, k);
 
@@ -93,11 +93,11 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < bmp.infoHeader.biSizeImage; ++i) { //writing pixels to new bmp file
 		fputc(pixels_out[i], file_out);
 
-		printf("%4d", pixels_out[i]);
-
-		if ((i + 1) % bmp.infoHeader.biWidth == 0) {
-			printf("\n");
-		}
+//		printf("%4d", pixels_out[i]);
+//
+//		if ((i + 1) % bmp.infoHeader.biWidth == 0) {
+//			printf("\n");
+//		}
 	}
 
 	fclose(file_out);

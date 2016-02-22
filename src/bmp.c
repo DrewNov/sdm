@@ -69,10 +69,10 @@ int bmp_read(bmp8_t *bmp, char *path) {
 	for (int i = 0; i < bmp->infoHeader.biHeight; ++i) {
 		for (int j = 0; j < bmp->infoHeader.biWidth; ++j) {
 			*p_pixels = fgetc(file_in);
-			printf("%4d", *p_pixels);
+//			printf("%4d", *p_pixels);
 			p_pixels++;
 		}
-		printf("\n");
+//		printf("\n");
 	}
 
 	fclose(file_in);

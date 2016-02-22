@@ -13,7 +13,7 @@
 
 //CUDA functions:
 __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned long v_in, int *nact) {
-	int i = threadIdx.x;
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j;
 
 	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
@@ -28,7 +28,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned lo
 }
 
 __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned long addr, int *nact) {
-	int i = threadIdx.x;
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j;
 
 	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
@@ -129,7 +129,7 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
 	cudaMalloc((void **) &d_nact, sizeof(int));
 	cudaMemset(d_nact, 0, sizeof(int));
 
-	sdm_write_cuda <<< 1, sdm->n >>> (*sdm, addr, v_in, d_nact);
+	sdm_write_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, addr, v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -147,7 +147,7 @@ int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out) {
 
 	cudaMemset(sdm->sumc, 0, sdm->d * sizeof(short));
 
-	sdm_read_cuda <<< 1, sdm->n >>> (*sdm, addr, d_nact);
+	sdm_read_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, addr, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_sumc, sdm->sumc, sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
