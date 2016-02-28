@@ -44,7 +44,7 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned long addr, int *nact) {
 
 
 //Main functions:
-void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned short k) {
+void sdm_init(sdm_jaekel_t *sdm, unsigned int n, unsigned int d, unsigned int k) {
 	int i;
 	unsigned long *h_mask;
 	size_t size_short = sizeof(short);

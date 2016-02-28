@@ -39,13 +39,13 @@ typedef struct {
 	unsigned long *mask;	/* Indexes */
 	short *sumc;			/* Sum of counter vectors */
 
-	unsigned short n;		/* Number of locations */
-	unsigned short d;		/* Number of dimensions in location */
-	unsigned short k;		/* Number of selection-bits in mask */
+	unsigned int n;		/* Number of locations */
+	unsigned int d;		/* Number of dimensions in location */
+	unsigned int k;		/* Number of selection-bits in mask */
 } sdm_jaekel_t;
 
 
-void sdm_init(sdm_jaekel_t *sdm, unsigned short n, unsigned short d, unsigned short k);
+void sdm_init(sdm_jaekel_t *sdm, unsigned int n, unsigned int d, unsigned int k);
 void sdm_free(sdm_jaekel_t *sdm);
 void sdm_print(sdm_jaekel_t *sdm);
 

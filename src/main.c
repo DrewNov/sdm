@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
 	bmp8_t bmp;
 
 	int i, j, l, vectors_in_layer;
-	unsigned short n, d, k;
+	unsigned int n, d, k;
 	unsigned long *vectors, *p_vectors;
 	unsigned char *pixels_out, *p_pixels_out;
 	char *path_in = "img/lena512.bmp", path_out[36];
@@ -21,9 +21,9 @@ int main(int argc, char *argv[]) {
 		d = 64;
 		k = 8;
 	} else {
-		n = (unsigned short) atoi(argv[1]);
-		d = (unsigned short) atoi(argv[2]);
-		k = (unsigned short) atoi(argv[3]);
+		n = atoi(argv[1]);
+		d = atoi(argv[2]);
+		k = atoi(argv[3]);
 	}
 
 	sprintf(path_out, "img/lena512_%d_%d_%d_%d.bmp", n, d, k, (unsigned int) time(NULL));
