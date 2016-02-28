@@ -9,8 +9,7 @@ int main(int argc, char *argv[]) {
 	sdm_jaekel_t sdm;
 	bmp8_t bmp;
 
-	int i, j, l, vectors_in_layer;
-	unsigned int n, d, k;
+	unsigned i, j, l, n, d, k, vectors_in_layer;
 	unsigned long *vectors, *p_vectors;
 	unsigned char *pixels_out, *p_pixels_out;
 	char *path_in = "img/lena512.bmp", path_out[36];
@@ -21,12 +20,12 @@ int main(int argc, char *argv[]) {
 		d = 64;
 		k = 8;
 	} else {
-		n = atoi(argv[1]);
-		d = atoi(argv[2]);
-		k = atoi(argv[3]);
+		n = (unsigned) atoi(argv[1]);
+		d = (unsigned) atoi(argv[2]);
+		k = (unsigned) atoi(argv[3]);
 	}
 
-	sprintf(path_out, "img/lena512_%d_%d_%d_%d.bmp", n, d, k, (unsigned int) time(NULL));
+	sprintf(path_out, "img/lena512_%d_%d_%d_%d.bmp", n, d, k, (unsigned) time(NULL));
 
 	sdm_init(&sdm, n, d, k);
 

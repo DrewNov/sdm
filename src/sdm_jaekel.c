@@ -16,7 +16,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned lo
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j;
 
-	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
+	if (!(addr & sdm.idxs[2 * i] ^ sdm.idxs[2 * i + 1])) {
 		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
 
 		for (j = 0; j < sdm.d; ++j) {
@@ -31,7 +31,7 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned long addr, int *nact) {
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j;
 
-	if (!(addr & sdm.mask[2 * i] ^ sdm.mask[2 * i + 1])) {
+	if (!(addr & sdm.idxs[2 * i] ^ sdm.idxs[2 * i + 1])) {
 		short *p_cntr = sdm.cntr + i * sdm.d;
 
 		for (j = 0; j < sdm.d; j++) {
@@ -44,52 +44,37 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned long addr, int *nact) {
 
 
 //Main functions:
-void sdm_init(sdm_jaekel_t *sdm, unsigned int n, unsigned int d, unsigned int k) {
-	int i;
-	unsigned long *h_mask;
+void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k) {
+	int i, pow2_k = 1 << k;
+	unsigned short *h_idxs;
 	size_t size_short = sizeof(short);
 
-	cudaMalloc((void **) &(sdm->cntr), n * d * size_short);
-	cudaMalloc((void **) &(sdm->mask), n * 2 * sizeof(long));
+	cudaMalloc((void **) &(sdm->cntr), n * d * pow2_k * size_short);
+	cudaMalloc((void **) &(sdm->idxs), n * pow2_k * size_short);
 	cudaMalloc((void **) &(sdm->sumc), d * size_short);
 
 	sdm->n = n;
 	sdm->d = d;
 	sdm->k = k;
 
-	cudaMemset(sdm->cntr, 0, n * d * size_short);
+	cudaMemset(sdm->cntr, 0, n * d * pow2_k * size_short);
 	cudaMemset(sdm->sumc, 0, d * size_short);
 
-	/* Initialize mask randomly */
-	srandom((unsigned int) time(NULL));
+	/* Initialize idxs randomly */
+	srandom((unsigned) time(NULL));
 
-	h_mask = (unsigned long *) malloc(n * 2 * sizeof(long));
+	h_idxs = (unsigned short *) malloc(n * pow2_k * size_short);
 
-	for (i = 0; i < n; ++i) {
-		int j = k;
-		unsigned long selection_mask = 0;
-		unsigned long value_mask = 0;
-
-		while (j) {
-			long rnd_digit = random() % d;
-
-			if (!(selection_mask >> rnd_digit & 1UL)) {
-				selection_mask |= 1UL << rnd_digit;
-				value_mask |= random() % 2 << rnd_digit;
-				j--;
-			}
-		}
-
-		h_mask[2 * i] = selection_mask;
-		h_mask[2 * i + 1] = value_mask;
+	for (i = 0; i < n * pow2_k; ++i) {
+		h_idxs[i] = (short) (random() % d);
 	}
 
-	cudaMemcpy(sdm->mask, h_mask, n * 2 * sizeof(long), cudaMemcpyHostToDevice);
+	cudaMemcpy(sdm->idxs, h_idxs, n * pow2_k * size_short, cudaMemcpyHostToDevice);
 }
 
 void sdm_free(sdm_jaekel_t *sdm) {
 	if (sdm->cntr != 0) cudaFree(sdm->cntr);
-	if (sdm->mask != 0) cudaFree(sdm->mask);
+	if (sdm->idxs != 0) cudaFree(sdm->idxs);
 	if (sdm->sumc != 0) cudaFree(sdm->sumc);
 	memset(sdm, 0, sizeof(sdm_jaekel_t));
 }
@@ -101,7 +86,7 @@ void sdm_print(sdm_jaekel_t *sdm) {
 	unsigned long *mask = (unsigned long *) malloc(sdm->n * 2 * sizeof(long));
 
 	cudaMemcpy(cntr, sdm->cntr, sdm->n * sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
-	cudaMemcpy(mask, sdm->mask, sdm->n * 2 * sizeof(long), cudaMemcpyDeviceToHost);
+	cudaMemcpy(mask, sdm->idxs, sdm->n * 2 * sizeof(long), cudaMemcpyDeviceToHost);
 
 	for (i = 0; i < sdm->n; ++i) {
 		if (*(cntr + i * sdm->d)) {
@@ -122,7 +107,7 @@ void sdm_print(sdm_jaekel_t *sdm) {
 }
 
 
-int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
+int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
 	int h_nact = 0;
 	int *d_nact;
 
@@ -136,7 +121,7 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in) {
 	return h_nact;
 }
 
-int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out) {
+int sdm_read(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_out) {
 	int i;
 	int h_nact = 0;
 	int *d_nact;

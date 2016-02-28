@@ -36,18 +36,18 @@ inline char *bin2str(unsigned long bin, int n) {
 
 typedef struct {
 	short *cntr;			/* Counters */
-	unsigned long *mask;	/* Indexes */
+	unsigned short *idxs;	/* Indexes */
 	short *sumc;			/* Sum of counter vectors */
 
-	unsigned int n;		/* Number of locations */
-	unsigned int d;		/* Number of dimensions in location */
-	unsigned int k;		/* Number of selection-bits in mask */
+	unsigned n;		/* Number of locations */
+	unsigned d;		/* Number of dimensions in location */
+	unsigned k;		/* Number of selection-bits in mask */
 } sdm_jaekel_t;
 
 
-void sdm_init(sdm_jaekel_t *sdm, unsigned int n, unsigned int d, unsigned int k);
+void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k);
 void sdm_free(sdm_jaekel_t *sdm);
 void sdm_print(sdm_jaekel_t *sdm);
 
-int sdm_write(sdm_jaekel_t *sdm, unsigned long addr, unsigned long v_in);
-int sdm_read(sdm_jaekel_t *sdm, unsigned long addr, unsigned long *v_out);
+int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in);
+int sdm_read(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_out);
