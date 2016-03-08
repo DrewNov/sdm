@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include "sdm_jaekel.h"
 #include "bmp.h"
 
@@ -10,15 +11,19 @@ int main(int argc, char *argv[]) {
 	bmp8_t bmp;
 
 	unsigned i, j, l, n, d, k, vectors_in_layer;
-	unsigned long *vectors, *p_vectors;
+	unsigned **vectors, **p_vectors, *vector, *p_vector;
 	unsigned char *pixels_out, *p_pixels_out;
 	char *path_in = "img/lena512.bmp", path_out[36];
 
 	if (argc == 1) {
-		printf("Example of use: sdm 1024 64 8, where n=1024; d=64; k=8\n");
+		printf("Example of use:\n\n"
+					   "sdm [n d k]\n\n"
+					   "n - number of locations\n"
+					   "d - number of digits\n"
+					   "k - number of selection-bits in mask\n\n");
 		n = 1024;
-		d = 64;
-		k = 8;
+		d = 8192;
+		k = 3;
 	} else {
 		n = (unsigned) atoi(argv[1]);
 		d = (unsigned) atoi(argv[2]);
@@ -34,25 +39,36 @@ int main(int argc, char *argv[]) {
 
 	vectors_in_layer = bmp.infoHeader.biSizeImage / d;
 
-	vectors = (unsigned long *) malloc(bmp.infoHeader.biBitCount * vectors_in_layer * sizeof(long));
+	vectors = (unsigned **) malloc(bmp.infoHeader.biBitCount * vectors_in_layer * sizeof(unsigned *));
 	p_vectors = vectors;
 
 	pixels_out = (unsigned char *) malloc(bmp.infoHeader.biSizeImage * sizeof(char));
 	p_pixels_out = pixels_out;
 
 	//Writing pixels by layers into SDM
+	vector = (unsigned *) malloc(d / 8);
+	p_vector = vector;
+	memset(vector, 0, d / 8);
+
 	for (j = 0; j < bmp.infoHeader.biBitCount; ++j) {
-		unsigned long vector = 0;
 		unsigned char layer_mask = (unsigned char) 1 << j;
 
 		for (i = 0; i < bmp.infoHeader.biSizeImage; ++i) {
-			vector <<= 1;
-			vector |= (bmp.pixels[i] & layer_mask) >> j;
+			*p_vector <<= 1;
+			*p_vector |= (bmp.pixels[i] & layer_mask) >> j;
+
+			if ((i + 1) % (sizeof(unsigned) * 8) == 0) {
+				p_vector++;
+			}
 
 			if ((i + 1) % d == 0) {
 				sdm_write(&sdm, vector, vector);
+
 				*p_vectors++ = vector;
-				vector = 0;
+
+				vector = (unsigned *) malloc(d / 8);
+				p_vector = vector;
+				memset(vector, 0, d / 8);
 			}
 		}
 	}
@@ -68,17 +84,20 @@ int main(int argc, char *argv[]) {
 	fclose(file_in);
 
 	for (i = 0; i < bmp.infoHeader.biBitCount * vectors_in_layer; ++i) { //reading vectors from SDM
-		unsigned long vector_out;
-		sdm_read(&sdm, vectors[i], &vector_out);
+		unsigned *vector_out = (unsigned *) malloc(d / 8);
+		memset(vector_out, 0, d / 8);
+
+		sdm_read(&sdm, vectors[i], vector_out);
 		vectors[i] = vector_out;
 	}
 
+	//todo: implement big vectors
 	for (l = 0; l < vectors_in_layer; ++l) { //converting vectors to pixels
 		for (j = d - 1; j >= 0; --j) {
 			unsigned char pixel = 0;
 			unsigned long digit_mask = 1UL << j;
 
-			for (i = bmp.infoHeader.biBitCount - 1; i >= 0; --i) {
+			for (i = bmp.infoHeader.biBitCount - 1U; i >= 0; --i) {
 				unsigned long vector = vectors[i * vectors_in_layer + l];
 				pixel <<= 1;
 				pixel |= (vector & digit_mask) >> j;
