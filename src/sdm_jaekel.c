@@ -108,13 +108,20 @@ void sdm_print(sdm_jaekel_t *sdm) {
 
 
 int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
-	int h_nact = 0;
+	int h_nact = 0, vect_size = sdm->d / 8;
 	int *d_nact;
+	unsigned *d_addr, *d_v_in;
 
 	cudaMalloc((void **) &d_nact, sizeof(int));
 	cudaMemset(d_nact, 0, sizeof(int));
 
-	sdm_write_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, addr, v_in, d_nact);
+	cudaMalloc((void **) &d_addr, vect_size);
+	cudaMemcpy(&d_addr, addr, vect_size, cudaMemcpyHostToDevice);
+
+	cudaMalloc((void **) &d_v_in, vect_size);
+	cudaMemcpy(&d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
+
+	sdm_write_cuda << < sdm->n / 1024, 1024 >> > (*sdm, addr, v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -122,26 +129,37 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
 }
 
 int sdm_read(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_out) {
-	int i;
+	int i, vect_size = sdm->d / 8;
+	unsigned *p_v_out = v_out;
+
 	int h_nact = 0;
-	int *d_nact;
 	short *h_sumc = (short *) malloc(sdm->d * sizeof(short));
+
+	int *d_nact;
+	unsigned *d_addr;
 
 	cudaMalloc((void **) &d_nact, sizeof(int));
 	cudaMemset(d_nact, 0, sizeof(int));
 
 	cudaMemset(sdm->sumc, 0, sdm->d * sizeof(short));
 
-	sdm_read_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, addr, d_nact);
+	cudaMalloc((void **) &d_addr, vect_size);
+	cudaMemcpy(&d_addr, addr, vect_size, cudaMemcpyHostToDevice);
+
+	sdm_read_cuda << < sdm->n / 1024, 1024 >> > (*sdm, d_addr, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_sumc, sdm->sumc, sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
 
-	*v_out = 0;
+	memset(v_out, 0, vect_size);
 
 	for (i = 0; i < sdm->d; ++i) {
-		*v_out <<= 1;
-		*v_out |= h_sumc[i] > 0;
+		*p_v_out <<= 1;
+		*p_v_out |= h_sumc[i] > 0;
+
+		if ((i + 1) % (sizeof(unsigned) * 8) == 0) {
+			p_v_out++;
+		}
 	}
 
 	return h_nact;

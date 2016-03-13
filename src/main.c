@@ -18,8 +18,8 @@ int main(int argc, char *argv[]) {
 	if (argc == 1) {
 		printf("Example of use:\n\n"
 				       "sdm [n d k]\n\n"
-				       "n - number of locations\n"
-				       "d - number of digits\n"
+				       "n - number of locations (multiple of 1024)\n"
+				       "d - number of digits (multiple of 32)\n"
 				       "k - number of selection-bits in mask\n\n");
 		n = 1024;
 		d = 8192;
@@ -85,8 +85,6 @@ int main(int argc, char *argv[]) {
 
 	for (i = 0; i < bmp.infoHeader.biBitCount * vectors_in_layer; ++i) { //reading vectors from SDM
 		unsigned *vector_out = (unsigned *) malloc(d / 8);
-		memset(vector_out, 0, d / 8);
-
 		sdm_read(&sdm, vectors[i], vector_out);
 		vectors[i] = vector_out;
 	}
