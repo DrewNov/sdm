@@ -10,17 +10,17 @@ int main(int argc, char *argv[]) {
 	sdm_jaekel_t sdm;
 	bmp8_t bmp;
 
-	unsigned i, j, l, n, d, k, vectors_in_layer;
+	unsigned i, j, l, n, d, k, vectors_in_layer, part_bits = sizeof(unsigned) * 8;
 	unsigned **vectors, **p_vectors, *vector, *p_vector;
 	unsigned char *pixels_out, *p_pixels_out;
 	char *path_in = "img/lena512.bmp", path_out[36];
 
 	if (argc == 1) {
 		printf("Example of use:\n\n"
-					   "sdm [n d k]\n\n"
-					   "n - number of locations\n"
-					   "d - number of digits\n"
-					   "k - number of selection-bits in mask\n\n");
+				       "sdm [n d k]\n\n"
+				       "n - number of locations\n"
+				       "d - number of digits\n"
+				       "k - number of selection-bits in mask\n\n");
 		n = 1024;
 		d = 8192;
 		k = 3;
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 			*p_vector <<= 1;
 			*p_vector |= (bmp.pixels[i] & layer_mask) >> j;
 
-			if ((i + 1) % (sizeof(unsigned) * 8) == 0) {
+			if ((i + 1) % part_bits == 0) {
 				p_vector++;
 			}
 
@@ -91,14 +91,16 @@ int main(int argc, char *argv[]) {
 		vectors[i] = vector_out;
 	}
 
-	//todo: implement big vectors
 	for (l = 0; l < vectors_in_layer; ++l) { //converting vectors to pixels
-		for (j = d - 1; j >= 0; --j) {
+		for (j = 0; j < d; ++j) {
 			unsigned char pixel = 0;
-			unsigned long digit_mask = 1UL << j;
+			unsigned part_num = j / part_bits;
+			unsigned num_in_part = j % part_bits;
+			unsigned digit_mask = 1U << (part_bits - num_in_part - 1);
 
 			for (i = bmp.infoHeader.biBitCount - 1U; i >= 0; --i) {
-				unsigned long vector = vectors[i * vectors_in_layer + l];
+				unsigned vector = vectors[i * vectors_in_layer + l][part_num];
+
 				pixel <<= 1;
 				pixel |= (vector & digit_mask) >> j;
 			}
