@@ -12,7 +12,7 @@
 
 
 //CUDA functions:
-__global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned long v_in, int *nact) {
+__global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in, int *nact) {
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j;
 
@@ -27,7 +27,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned long addr, unsigned lo
 	}
 }
 
-__global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned long addr, int *nact) {
+__global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j;
 
@@ -118,10 +118,11 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
 	cudaMalloc((void **) &d_addr, vect_size);
 	cudaMemcpy(&d_addr, addr, vect_size, cudaMemcpyHostToDevice);
 
-	cudaMalloc((void **) &d_v_in, vect_size);
-	cudaMemcpy(&d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
+//	cudaMalloc((void **) &d_v_in, vect_size);
+//	cudaMemcpy(&d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
+	d_v_in = d_addr;
 
-	sdm_write_cuda << < sdm->n / 1024, 1024 >> > (*sdm, addr, v_in, d_nact);
+	sdm_write_cuda << < sdm->n / 1024, 1024 >> > (*sdm, d_addr, d_v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
