@@ -13,8 +13,21 @@
 
 //CUDA functions:
 __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in, int *nact) {
-	int i = blockDim.x * blockIdx.x + threadIdx.x;
-	int j;
+	int i = blockDim.x * blockIdx.x + threadIdx.x, j, k;
+	int pow2_k = 1 << sdm.k, cntr_number = 0;
+	short *current_cntr;
+	unsigned short *current_idx = sdm.idxs[pow2_k * i];
+	unsigned part_bits = sizeof(unsigned) * 8;
+
+	for (k = 0; k < sdm.k; ++k) {
+		unsigned short idx = *current_idx++;
+		unsigned part_num = idx / part_bits;
+		unsigned num_in_part = idx % part_bits;
+		unsigned digit_mask = 1U << num_in_part;
+
+		cntr_number <<= 1;
+		cntr_number |= addr[part_num] & digit_mask > 0;
+	}
 
 	if (!(addr & sdm.idxs[2 * i] ^ sdm.idxs[2 * i + 1])) {
 		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
