@@ -11,25 +11,31 @@
 #include "sdm_jaekel.h"
 
 
+//Helper functions:
+int comparator(const void *a, const void *b) {
+	return *(unsigned short *) b - *(unsigned short *) a;
+}
+
 //CUDA functions:
 __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in, int *nact) {
-	int i = blockDim.x * blockIdx.x + threadIdx.x, j, k;
-	int pow2_k = 1 << sdm.k, cntr_number = 0;
+	int i = blockDim.x * blockIdx.x + threadIdx.x, j, k, part_bits = sizeof(unsigned) * 8;
 	short *current_cntr;
-	unsigned short *current_idx = sdm.idxs[pow2_k * i];
-	unsigned part_bits = sizeof(unsigned) * 8;
+	unsigned short *p_idx = sdm.idxs + sdm.k * i;
+	unsigned cntr_number = 0;
 
 	for (k = 0; k < sdm.k; ++k) {
-		unsigned short idx = *current_idx++;
+		unsigned short idx = *p_idx++;
 		unsigned part_num = idx / part_bits;
 		unsigned num_in_part = idx % part_bits;
 		unsigned digit_mask = 1U << num_in_part;
 
 		cntr_number <<= 1;
-		cntr_number |= addr[part_num] & digit_mask > 0;
+		cntr_number |= (addr[part_num] & digit_mask) > 0;
 	}
 
 	if (!(addr & sdm.idxs[2 * i] ^ sdm.idxs[2 * i + 1])) {
+		//todo: find current counter:
+		//short *p_cntr = sdm.cntr + sdm.d * pow2_k * i + cntr_number     (i + 1) * sdm.d - 1; //pointer to last counter in location
 		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
 
 		for (j = 0; j < sdm.d; ++j) {
@@ -58,12 +64,12 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
 
 //Main functions:
 void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k) {
-	int i, pow2_k = 1 << k;
+	int i, j, pow2_k = 1 << k;
 	unsigned short *h_idxs;
 	size_t size_short = sizeof(short);
 
 	cudaMalloc((void **) &(sdm->cntr), n * d * pow2_k * size_short);
-	cudaMalloc((void **) &(sdm->idxs), n * pow2_k * size_short);
+	cudaMalloc((void **) &(sdm->idxs), n * k * size_short);
 	cudaMalloc((void **) &(sdm->sumc), d * size_short);
 
 	sdm->n = n;
@@ -76,13 +82,17 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k) {
 	/* Initialize idxs randomly */
 	srandom((unsigned) time(NULL));
 
-	h_idxs = (unsigned short *) malloc(n * pow2_k * size_short);
+	h_idxs = (unsigned short *) malloc(n * k * size_short);
 
-	for (i = 0; i < n * pow2_k; ++i) {
-		h_idxs[i] = (short) (random() % d);
+	for (i = 0; i < n * k; ++i) {
+		h_idxs[i] = (unsigned short) (random() % d);
+
+		if ((i + 1) % k == 0) {
+			qsort(h_idxs + i - k + 1, k, size_short, comparator);
+		}
 	}
 
-	cudaMemcpy(sdm->idxs, h_idxs, n * pow2_k * size_short, cudaMemcpyHostToDevice);
+	cudaMemcpy(sdm->idxs, h_idxs, n * k * size_short, cudaMemcpyHostToDevice);
 }
 
 void sdm_free(sdm_jaekel_t *sdm) {
