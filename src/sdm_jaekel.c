@@ -16,34 +16,38 @@ int comparator(const void *a, const void *b) {
 	return *(unsigned short *) b - *(unsigned short *) a;
 }
 
+
 //CUDA functions:
 __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in, int *nact) {
 	int i = blockDim.x * blockIdx.x + threadIdx.x, j, k, part_bits = sizeof(unsigned) * 8;
-	short *current_cntr;
+	short *p_cntr;
 	unsigned short *p_idx = sdm.idxs + sdm.k * i;
-	unsigned cntr_number = 0;
+	unsigned location_number = 0;
 
+	//calculating location number from mask
 	for (k = 0; k < sdm.k; ++k) {
 		unsigned short idx = *p_idx++;
 		unsigned part_num = idx / part_bits;
 		unsigned num_in_part = idx % part_bits;
 		unsigned digit_mask = 1U << num_in_part;
 
-		cntr_number <<= 1;
-		cntr_number |= (addr[part_num] & digit_mask) > 0;
+		location_number <<= 1;
+		location_number |= (addr[part_num] & digit_mask) > 0;
 	}
 
-	if (!(addr & sdm.idxs[2 * i] ^ sdm.idxs[2 * i + 1])) {
-		//todo: find current counter:
-		//short *p_cntr = sdm.cntr + sdm.d * pow2_k * i + cntr_number     (i + 1) * sdm.d - 1; //pointer to last counter in location
-		short *p_cntr = sdm.cntr + (i + 1) * sdm.d - 1; //pointer to last counter in location
+	//modifying counters of activated location
+	p_cntr = sdm.cntr + sdm.d * ((1 << sdm.k) * i + location_number + 1) - 1; //last counter in location
 
-		for (j = 0; j < sdm.d; ++j) {
-			1UL << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
+	for (j = 0; j < sdm.d; ++j) {
+		1UL << j & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
+
+		//todo: check this
+		if ((j + 1) % part_bits == 0) {
+			v_in++;
 		}
-
-		(*nact)++;
 	}
+
+	(*nact)++;
 }
 
 __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
@@ -145,7 +149,7 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
 //	cudaMemcpy(&d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
 	d_v_in = d_addr;
 
-	sdm_write_cuda << < sdm->n / 1024, 1024 >> > (*sdm, d_addr, d_v_in, d_nact);
+	sdm_write_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, d_addr, d_v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -170,7 +174,7 @@ int sdm_read(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_out) {
 	cudaMalloc((void **) &d_addr, vect_size);
 	cudaMemcpy(&d_addr, addr, vect_size, cudaMemcpyHostToDevice);
 
-	sdm_read_cuda << < sdm->n / 1024, 1024 >> > (*sdm, d_addr, d_nact);
+	sdm_read_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, d_addr, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_sumc, sdm->sumc, sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
