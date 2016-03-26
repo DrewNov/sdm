@@ -39,7 +39,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in,
 	p_cntr = sdm.cntr + sdm.d * ((1 << sdm.k) * i + location_num) + part_bits - 1; //last counter in 1 part of location
 
 	for (j = 0; j < sdm.d; ++j) {
-		1U << (j % part_bits) & v_in ? (*p_cntr--)++ : (*p_cntr--)--;
+		1U << (j % part_bits) & *v_in ? (*p_cntr--)++ : (*p_cntr--)--;
 
 		if ((j + 1) % part_bits == 0) {
 			v_in++;
@@ -68,7 +68,7 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
 	}
 
 	//reading counters of activated location
-	*p_cntr = sdm.cntr + sdm.d * ((1 << sdm.k) * i + location_num);
+	p_cntr = sdm.cntr + sdm.d * ((1 << sdm.k) * i + location_num);
 
 	for (j = 0; j < sdm.d; j++) {
 		sdm.sumc[j] += p_cntr[j];
@@ -80,7 +80,7 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
 
 //Main functions:
 void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k) {
-	int i, j, pow2_k = 1 << k;
+	int i, pow2_k = 1 << k;
 	unsigned short *h_idxs;
 	size_t size_short = sizeof(short);
 

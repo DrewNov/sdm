@@ -10,7 +10,8 @@ int main(int argc, char *argv[]) {
 	sdm_jaekel_t sdm;
 	bmp8_t bmp;
 
-	unsigned i, j, l, n, d, k, vectors_in_layer, part_bits = sizeof(unsigned) * 8;
+	int i, j, l;
+	unsigned n, d, k, vectors_in_layer, part_bits = sizeof(unsigned) * 8;
 	unsigned **vectors, **p_vectors, *vector, *p_vector;
 	unsigned char *pixels_out, *p_pixels_out;
 	char *path_in = "img/lena512.bmp", path_out[36];
@@ -96,7 +97,7 @@ int main(int argc, char *argv[]) {
 			unsigned num_in_part = j % part_bits;
 			unsigned digit_mask = 1U << (part_bits - num_in_part - 1);
 
-			for (i = bmp.infoHeader.biBitCount - 1U; i >= 0; --i) {
+			for (i = bmp.infoHeader.biBitCount - 1; i >= 0; --i) {
 				unsigned vector = vectors[i * vectors_in_layer + l][part_num];
 
 				pixel <<= 1;
