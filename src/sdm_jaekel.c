@@ -24,7 +24,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in,
 	unsigned short *p_idx = sdm.idxs + sdm.k * i;
 	unsigned location_num = 0;
 
-	//calculating location number from mask
+	//calculating location number from mask todo: make a separate function
 	for (k = 0; k < sdm.k; ++k) {
 		unsigned short idx = *p_idx++;
 		unsigned part_num = idx / part_bits;
@@ -51,18 +51,30 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in,
 }
 
 __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
-	int i = blockDim.x * blockIdx.x + threadIdx.x;
-	int j;
+	int i = blockDim.x * blockIdx.x + threadIdx.x, j, k, part_bits = sizeof(unsigned) * 8;
+	short *p_cntr;
+	unsigned short *p_idx = sdm.idxs + sdm.k * i;
+	unsigned location_num = 0;
 
-	if (!(addr & sdm.idxs[2 * i] ^ sdm.idxs[2 * i + 1])) {
-		short *p_cntr = sdm.cntr + i * sdm.d;
+	//calculating location number from mask todo: make a separate function
+	for (k = 0; k < sdm.k; ++k) {
+		unsigned short idx = *p_idx++;
+		unsigned part_num = idx / part_bits;
+		unsigned num_in_part = idx % part_bits;
+		unsigned digit_mask = 1U << num_in_part;
 
-		for (j = 0; j < sdm.d; j++) {
-			sdm.sumc[j] += p_cntr[j];
-		}
-
-		(*nact)++;
+		location_num <<= 1;
+		location_num |= (addr[part_num] & digit_mask) > 0;
 	}
+
+	//reading counters of activated location
+	*p_cntr = sdm.cntr + sdm.d * ((1 << sdm.k) * i + location_num);
+
+	for (j = 0; j < sdm.d; j++) {
+		sdm.sumc[j] += p_cntr[j];
+	}
+
+	(*nact)++;
 }
 
 
