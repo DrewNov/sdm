@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
 		for (i = 0; i < bmp.infoHeader.biSizeImage; ++i) {
 			*p_vector <<= 1;
-			*p_vector |= (bmp.pixels[i] & layer_mask) >> j;
+			*p_vector |= (bmp.pixels[i] & layer_mask) > 0;
 
 			if ((i + 1) % part_bits == 0) {
 				p_vector++;
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 				unsigned vector = vectors[i * vectors_in_layer + l][part_num];
 
 				pixel <<= 1;
-				pixel |= (vector & digit_mask) >> j;
+				pixel |= (vector & digit_mask) > 0;
 			}
 
 			*p_pixels_out++ = pixel;
