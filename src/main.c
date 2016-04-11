@@ -16,12 +16,17 @@ int main(int argc, char *argv[]) {
 	unsigned char *pixels_out, *p_pixels_out;
 	char *path_in = "img/lena512.bmp", path_out[36];
 
-	if (argc == 1) {
+	if (argc < 4) {
 		printf("Example of use:\n\n"
 				       "sdm [n d k]\n\n"
-				       "n - number of locations (multiple of 1024)\n"
-				       "d - number of digits (multiple of 32)\n"
-				       "k - number of selection-bits in mask\n\n");
+				       "n - number of locations, default value is 1024 (multiple of 1024)\n"
+				       "d - number of digits, default value is 8192 (multiple of 32)\n"
+				       "k - number of selection-bits in mask, default value is 3 \n\n");
+
+		if (argc > 1) {
+			return 0;
+		}
+
 		n = 1024;
 		d = 8192;
 		k = 3;
@@ -53,6 +58,8 @@ int main(int argc, char *argv[]) {
 
 	for (j = 0; j < bmp.infoHeader.biBitCount; ++j) {
 		unsigned char layer_mask = (unsigned char) 1 << j;
+
+		printf("writing   to layer: #%d\n", j + 1);
 
 		for (i = 0; i < bmp.infoHeader.biSizeImage; ++i) {
 			*p_vector <<= 1;
@@ -86,6 +93,11 @@ int main(int argc, char *argv[]) {
 
 	for (i = 0; i < bmp.infoHeader.biBitCount * vectors_in_layer; ++i) { //reading vectors from SDM
 		unsigned *vector_out = (unsigned *) malloc(d / 8);
+
+		if (i % vectors_in_layer == 0) {
+			printf("reading from layer: #%d\n", i / vectors_in_layer + 1);
+		}
+
 		sdm_read(&sdm, vectors[i], vector_out);
 		vectors[i] = vector_out;
 	}
@@ -111,12 +123,6 @@ int main(int argc, char *argv[]) {
 	printf("\n");
 	for (i = 0; i < bmp.infoHeader.biSizeImage; ++i) { //writing pixels to new bmp file
 		fputc(pixels_out[i], file_out);
-
-//		printf("%4d", pixels_out[i]);
-//
-//		if ((i + 1) % bmp.infoHeader.biWidth == 0) {
-//			printf("\n");
-//		}
 	}
 
 	fclose(file_out);

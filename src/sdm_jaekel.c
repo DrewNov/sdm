@@ -43,7 +43,7 @@ __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in,
 
 		if ((j + 1) % part_bits == 0) {
 			v_in++;
-			p_cntr += part_bits * 2 - 1;
+			p_cntr += part_bits * 2;
 		}
 	}
 
@@ -120,29 +120,37 @@ void sdm_free(sdm_jaekel_t *sdm) {
 
 void sdm_print(sdm_jaekel_t *sdm) {
 	int i, j;
+	FILE *f = fopen("out.txt", "w");
 
-	short *cntr = (short *) malloc(sdm->n * sdm->d * sizeof(short));
-	unsigned long *mask = (unsigned long *) malloc(sdm->n * 2 * sizeof(long));
+	short *cntr = (short *) malloc(sdm->n * sdm->d * (1 << sdm->k) * sizeof(short));
+	unsigned short *idxs = (unsigned short *) malloc(sdm->n * sdm->k * sizeof(unsigned short));
 
-	cudaMemcpy(cntr, sdm->cntr, sdm->n * sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
-	cudaMemcpy(mask, sdm->idxs, sdm->n * 2 * sizeof(long), cudaMemcpyDeviceToHost);
+	cudaMemcpy(cntr, sdm->cntr, sdm->n * sdm->d * (1 << sdm->k) * sizeof(short), cudaMemcpyDeviceToHost);
+	cudaMemcpy(idxs, sdm->idxs, sdm->n * sdm->k * sizeof(unsigned short), cudaMemcpyDeviceToHost);
 
-	for (i = 0; i < sdm->n; ++i) {
-		if (*(cntr + i * sdm->d)) {
-			printf("#%4d:", i);
+	for (j = 0; j < 10; ++j) {
+		fprintf(f, "#%2d\n\n", j);
 
-			//Run through Counters:
-			for (j = sdm->d * i; j < sdm->d * (i + 1); ++j) {
-				printf("%2d", cntr[j]);
+		for (i = 0; i < sdm->k; ++i) {
+			fprintf(f, "%5d", *idxs++);
+		}
+
+		fprintf(f, "\n\n");
+
+		for (i = 0; i < sdm->d * (1 << sdm->k); ++i) {
+			if (i % sdm->d == 0) {
+				fprintf(f, "%d\n", i / sdm->d);
 			}
 
-			//Run through Indexes:
-			printf("\nmask1: %s\nmask2: %s\n\n", BIN2STR(*mask, sdm->d), BIN2STR(*(mask + 1), sdm->d));
-			mask += 2;
-		}
-	}
+			fprintf(f, "%2d", *cntr++);
 
-	printf("\n");
+			if ((i + 1) % sdm->d == 0) {
+				fprintf(f, "\n\n");
+			}
+		}
+
+		fprintf(f, "\n\n");
+	}
 }
 
 
@@ -155,13 +163,13 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
 	cudaMemset(d_nact, 0, sizeof(int));
 
 	cudaMalloc((void **) &d_addr, vect_size);
-	cudaMemcpy(&d_addr, addr, vect_size, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_addr, addr, vect_size, cudaMemcpyHostToDevice);
 
 //	cudaMalloc((void **) &d_v_in, vect_size);
-//	cudaMemcpy(&d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
+//	cudaMemcpy(d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
 	d_v_in = d_addr;
 
-	sdm_write_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, d_addr, d_v_in, d_nact);
+	sdm_write_cuda <<< sdm->n / 1024 + (sdm->n % 1024 > 0), sdm->n % 1024 >>> (*sdm, d_addr, d_v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -184,9 +192,9 @@ int sdm_read(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_out) {
 	cudaMemset(sdm->sumc, 0, sdm->d * sizeof(short));
 
 	cudaMalloc((void **) &d_addr, vect_size);
-	cudaMemcpy(&d_addr, addr, vect_size, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_addr, addr, vect_size, cudaMemcpyHostToDevice);
 
-	sdm_read_cuda <<< sdm->n / 1024, 1024 >>> (*sdm, d_addr, d_nact);
+	sdm_read_cuda <<< sdm->n / 1024 + (sdm->n % 1024 > 0), sdm->n % 1024 >>> (*sdm, d_addr, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_sumc, sdm->sumc, sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
