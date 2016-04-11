@@ -169,7 +169,7 @@ int sdm_write(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_in) {
 //	cudaMemcpy(d_v_in, v_in, vect_size, cudaMemcpyHostToDevice);
 	d_v_in = d_addr;
 
-	sdm_write_cuda <<< sdm->n / 1024 + (sdm->n % 1024 > 0), sdm->n % 1024 >>> (*sdm, d_addr, d_v_in, d_nact);
+	sdm_write_cuda <<< sdm->n < 1024 ? 1 : (sdm->n / 1024), sdm->n < 1024 ? sdm->n : 1024 >>> (*sdm, d_addr, d_v_in, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -194,7 +194,7 @@ int sdm_read(sdm_jaekel_t *sdm, unsigned *addr, unsigned *v_out) {
 	cudaMalloc((void **) &d_addr, vect_size);
 	cudaMemcpy(d_addr, addr, vect_size, cudaMemcpyHostToDevice);
 
-	sdm_read_cuda <<< sdm->n / 1024 + (sdm->n % 1024 > 0), sdm->n % 1024 >>> (*sdm, d_addr, d_nact);
+	sdm_read_cuda <<< sdm->n < 1024 ? 1 : (sdm->n / 1024), sdm->n < 1024 ? sdm->n : 1024 >>> (*sdm, d_addr, d_nact);
 
 	cudaMemcpy(&h_nact, d_nact, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_sumc, sdm->sumc, sdm->d * sizeof(short), cudaMemcpyDeviceToHost);
