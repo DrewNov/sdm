@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
 	sprintf(path_out, "img/lena512_%d_%d_%d_%d.bmp", n, d, k, (unsigned) time(NULL));
 
 	sdm_init(&sdm, n, d, k);
+	sdm_print(&sdm);
 
 	//Reading bmp from file to array of pixels
 	bmp_read(&bmp, path_in);
@@ -80,6 +81,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
+
+	printf("\n");
 
 	//Reading from SDM and writing to new bmp file with the same headers
 	FILE *file_in = fopen(path_in, "rb");

@@ -16,6 +16,16 @@ int comparator(const void *a, const void *b) {
 	return *(unsigned short *) b - *(unsigned short *) a;
 }
 
+void fill_probability(float *b, const unsigned short *num_in_mask, float sum, unsigned count) {
+	int i;
+
+	b[0] = 0;
+
+	for (i = 0; i < count; ++i) {
+		b[i + 1] = b[i] + (int) (RAND_MAX / (num_in_mask[i] + 1) / sum + 0.5);
+	}
+}
+
 
 //CUDA functions:
 __global__ void sdm_write_cuda(sdm_jaekel_t sdm, unsigned *addr, unsigned *v_in, int *nact) {
@@ -80,8 +90,9 @@ __global__ void sdm_read_cuda(sdm_jaekel_t sdm, unsigned *addr, int *nact) {
 
 //Main functions:
 void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k) {
-	int i, pow2_k = 1 << k;
-	unsigned short *h_idxs;
+	int i, j, r, pow2_k = 1 << k;
+	float b[d + 1], sum = 0;
+	unsigned short *h_idxs, num_in_mask[d], selected_bits;
 	size_t size_short = sizeof(short);
 
 	cudaMalloc((void **) &(sdm->cntr), n * d * pow2_k * size_short);
@@ -100,13 +111,42 @@ void sdm_init(sdm_jaekel_t *sdm, unsigned n, unsigned d, unsigned k) {
 
 	h_idxs = (unsigned short *) malloc(n * k * size_short);
 
-	for (i = 0; i < n * k; ++i) {
-		h_idxs[i] = (unsigned short) (random() % d);
-
-		if ((i + 1) % k == 0) {
-			qsort(h_idxs + i - k + 1, k, size_short, comparator);
-		}
+	memset(num_in_mask, 0, d * size_short);
+	for (i = 0; i < d; ++i) {
+		sum += 1. / (num_in_mask[i] + 1);
 	}
+
+	fill_probability(b, num_in_mask, sum, d);
+
+	for (i = 0; i < n; ++i) {
+		selected_bits = 0;
+
+		while (selected_bits < k) {
+			for (j = 0; j < d; ++j) {
+				r = rand();
+				if (b[j] <= r && r < b[j + 1]) {
+					h_idxs[i * k + selected_bits] = j;
+					num_in_mask[j]++;
+					sum += 1. / (num_in_mask[j] + 1) - 1. / num_in_mask[j];
+					fill_probability(b, num_in_mask, sum, d);
+					selected_bits++;
+					if (selected_bits == k) {
+						break;
+					}
+				}
+			}
+
+			if (selected_bits < k) {
+				printf("#%d\tselected_bits=%d\n", i, selected_bits);
+			} else {
+				printf("#%d\tGOOD\n", i);
+			}
+		}
+
+		qsort(h_idxs + i * k, k, size_short, comparator);
+	}
+
+	printf("\n");
 
 	cudaMemcpy(sdm->idxs, h_idxs, n * k * size_short, cudaMemcpyHostToDevice);
 }
@@ -122,34 +162,34 @@ void sdm_print(sdm_jaekel_t *sdm) {
 	int i, j;
 	FILE *f = fopen("out.txt", "w");
 
-	short *cntr = (short *) malloc(sdm->n * sdm->d * (1 << sdm->k) * sizeof(short));
+//	short *cntr = (short *) malloc(sdm->n * sdm->d * (1 << sdm->k) * sizeof(short));
 	unsigned short *idxs = (unsigned short *) malloc(sdm->n * sdm->k * sizeof(unsigned short));
 
-	cudaMemcpy(cntr, sdm->cntr, sdm->n * sdm->d * (1 << sdm->k) * sizeof(short), cudaMemcpyDeviceToHost);
+//	cudaMemcpy(cntr, sdm->cntr, sdm->n * sdm->d * (1 << sdm->k) * sizeof(short), cudaMemcpyDeviceToHost);
 	cudaMemcpy(idxs, sdm->idxs, sdm->n * sdm->k * sizeof(unsigned short), cudaMemcpyDeviceToHost);
 
-	for (j = 0; j < 10; ++j) {
-		fprintf(f, "#%2d\n\n", j);
+	for (j = 0; j < sdm->n; ++j) {
+		fprintf(f, "#%2d:\t", j);
 
 		for (i = 0; i < sdm->k; ++i) {
-			fprintf(f, "%5d", *idxs++);
+			fprintf(f, "%6d", *idxs++);
 		}
 
-		fprintf(f, "\n\n");
+		fprintf(f, "\n");
 
-		for (i = 0; i < sdm->d * (1 << sdm->k); ++i) {
-			if (i % sdm->d == 0) {
-				fprintf(f, "%d\n", i / sdm->d);
-			}
-
-			fprintf(f, "%2d", *cntr++);
-
-			if ((i + 1) % sdm->d == 0) {
-				fprintf(f, "\n\n");
-			}
-		}
-
-		fprintf(f, "\n\n");
+//		for (i = 0; i < sdm->d * (1 << sdm->k); ++i) {
+//			if (i % sdm->d == 0) {
+//				fprintf(f, "%d\n", i / sdm->d);
+//			}
+//
+//			fprintf(f, "%2d", *cntr++);
+//
+//			if ((i + 1) % sdm->d == 0) {
+//				fprintf(f, "\n\n");
+//			}
+//		}
+//
+//		fprintf(f, "\n\n");
 	}
 }
 
